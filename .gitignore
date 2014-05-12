@@ -1,6 +1,10 @@
 .eunit
+.rebar
 deps
 *.o
 *.beam
 *.plt
-erl_crash.dump
+*.swp
+apps/tlor/ebin/*
+rel/tlor/*
+
