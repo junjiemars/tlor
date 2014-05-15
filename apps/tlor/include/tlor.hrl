@@ -9,3 +9,14 @@
 -define(DBG_RET(R, D), R).
 -endif.
 
+-record(received_packet,
+        {
+          packet_type, % message, iq, presence
+          type_attr,   % depend on packet. Example: set, get, subscribe, etc
+          from,        % JID
+          id,          % Packet ID
+          queryns,     % IQ only: Namespace of the query
+          raw_packet   % raw exmpp record
+        }).
+
+

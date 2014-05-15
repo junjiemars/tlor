@@ -1,6 +1,7 @@
 PROJECT = tlor
 DIALYZER = dialyzer
 REBAR = rebar
+DEBUG = tlor_debug
 
 .PHONY: all deps compile clean test ct build-plt dialyze release 
 
@@ -10,7 +11,7 @@ deps:
 	$(REBAR) -C rebar.config get-deps
 
 compile:
-	$(REBAR) compile
+	$(REBAR) compile -Dtlor_debug
 
 clean:
 	$(REBAR) clean

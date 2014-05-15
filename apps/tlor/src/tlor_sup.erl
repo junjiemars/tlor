@@ -24,5 +24,6 @@ start_link() ->
 
 init([]) ->
     G = ?CHILD(gandalf, worker),
-    {ok, { {one_for_one, 5, 10}, [G]} }.
+    H = ?CHILD(hobbit, worker),
+    {ok, { {one_for_one, 5, 10}, [G, H]} }.
 
