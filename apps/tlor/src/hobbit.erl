@@ -15,6 +15,8 @@
                  info/2
         ]).
 
+-record(xmlel, {ns, declared_ns, name, attrs=[], children=[]}).
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -22,7 +24,7 @@
 -export([start_link/0]).
 -export([disco_info/2, disco_info/3, disco_items/2, disco_items/3]).
 -export([create_node/3, delete_node/3, node_config/3, config_node/5]).
--export([info/1, build_node_config/2]).
+-export([info/1, set_cdata/4]).
 
 
 %% ------------------------------------------------------------------
@@ -50,7 +52,7 @@ node_config(Who, Passwd, Node) -> gen_server:call(?MODULE, {node_config, Who, Pa
 config_node(Who, Passwd, Node, Option, Optarg) -> gen_server:call(?MODULE, {config_node, Who, Passwd, Node, Option, Optarg}).
 
 info(Code) -> gen_server:call(?MODULE, {info, Code}).
-build_node_config(Service, Node) -> gen_server:call(?MODULE, {build_node_config, Service, Node}).
+set_cdata(Node, Name, Attr, Cdata) -> gen_server:call(?MODULE, {set_cdata, Node, Name, Attr, Cdata}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -184,31 +186,12 @@ handle_call({config_node, Who, Passwd, _Node, _Option, _Optarg}, _From, Session)
     case login(Session, Who, Passwd) of
         {ok, _J} ->
             {ok, _S} = application:get_env(pubsub_service),
-            X0 = exmpp_xml:element("jabberd:x:data", "x"),
-            Xtype = exmpp_xml:set_attribute(X0, exmpp_xml:attribute(<<"type">>, "submit")),
-            F0 = exmpp_xml:element("field"),
-            Fvar0 = exmpp_xml:set_attribute(F0, exmpp_xml:attribute(<<"var">>, "FORM_TYPE")),
-            Ftype0 = exmpp_xml:set_attribute(Fvar0, exmpp_xml:attribute(<<"type">>, "hidden")),
-            Vf0 = exmpp_xml:set_cdata(exmpp_xml:element("value"), 
-                unicode:characters_to_binary("http://jabber.org/protocol/pubsub#node_config")),
-            _V0 = exmpp_xml:append_child(Ftype0, Vf0),
-
-            F1 = exmpp_xml:element("field"),
-            Fvar1 = exmpp_xml:set_attribute(F1, exmpp_xml:attribute(<<"var">>, "pubsub#send_last_published_item")),
-            Fval1 = exmpp_xml:set_cdata(exmpp_xml:element("value"), unicode:characters_to_binary("on_sub")),
-            Fp1 = exmpp_xml:append_child(Fvar1, Fval1),
-
-            C = exmpp_xml:append_children(Xtype, [_V0, Fp1]),
-            N = exmpp_client_pubsub:set_node_configuration(_S, _Node, C),
-            P = exmpp_stanza:set_sender(N, _J),
-            io:format("##~s~n", exmpp_xml:document_to_iolist(P)),
-            case send_packet(Session, P) of
-               {ok, _} -> 
-                    receive
-                        #received_packet{packet_type=iq, raw_packet=_R} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _R})}, restart_session(Session)}
-                    end;
-                E -> {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
+            case request_node_config(_J, _S, _Node, Session) of
+                {ok, N} -> 
+                    #xmlel{children=C} = N,
+                    Xold = find_element(C, "jabber:x:data", "x"),
+                    {reply, {ok, N, Xold}, restart_session(Session)};
+                E -> {reply, E, restart_session(Session)}
             end;
         E -> {reply, E, restart_session(Session)}
     end;
@@ -216,15 +199,8 @@ handle_call({config_node, Who, Passwd, _Node, _Option, _Optarg}, _From, Session)
 handle_call({info, Code}, _From, Session) ->
     {reply, info(Code, ?RESOURCE), Session};
 
-handle_call({build_node_config, Service, Node}, _From, Session) ->
-    V = exmpp_xml:set_cdata(exmpp_xml:element(value), "on_sub"),
-    F = exmpp_xml:set_children(exmpp_xml:element(field), [V]),
-    X = exmpp_xml:set_children(exmpp_xml:element("jabber:x:data", "x"), [F]),
-    Y = exmpp_xml:remove_attribute(X, "xmlns"),
-    P = exmpp_client_pubsub:set_node_configuration(Service, Node, Y),
-    io:format("##~s~n", exmpp_xml:document_to_iolist(P)),
-    {reply, P, Session};
-
+handle_call({set_cdata, Node, Name, Attr, Cdata}, _From, Session) ->
+    {reply, set_cdata2(Node, Name, Attr, Cdata)};
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -248,4 +224,46 @@ code_change(_OldVsn, State, _Extra) ->
 login(Session, Who, Passwd) ->
     login(Session, Who, Passwd, ?RESOURCE, false).
 
+request_node_config(Jid, Service, Node, Session) ->
+    N = exmpp_client_pubsub:get_node_configuration(Service, Node),
+    P = exmpp_stanza:set_sender(N, Jid),
+    case send_packet(Session, P) of
+        {ok, _} ->
+            receive
+                #received_packet{packet_type=iq, raw_packet=R} -> {ok, R}
+            end;
+        E -> E
+    end.
+
+
+find_element([], _NS, _Name) ->
+    undefined;
+
+find_element([Node|_Tail], NS, Name) ->
+    case exmpp_xml:element_matches(Node, NS, Name) of
+        true -> Node;
+        false -> 
+            #xmlel{children=N} = Node,
+            find_element(N, NS, Name)
+    end.
+
+set_cdata2([], _Name, _Attr, _Cdata) ->
+    undefined;
+
+set_cdata2([Node|Tail], Name, Attr, Cdata) ->
+    case exmpp_xml:element_matches(Node, Name) of
+        true -> 
+            io:format("##~s~n", exmpp_xml:document_to_iolist(Node)),
+            set_cdata2(Tail, Name, Attr, Cdata);
+            %%case exmpp_xml:get_attribute(Node, <<"var">>, undefined) of
+            %%    undefined -> set_cdata2(Tail, Name, Attr, Cdata);
+            %%    Attr -> io:format("##~s~n", exmpp_xml:document_to_iolist(Node))
+            %%end;
+        false -> 
+            io:format("##~s~n", "nofound")
+            %%#xmlel{children=N} = Node,
+            %%io:format("##~s~n", exmpp_xml:document_to_iolist(N)),
+            %%set_cdata2(N, Name, Attr, Cdata)
+    end.
+   
 

@@ -33,5 +33,5 @@ build-plt:
 dialyze: clean deps test-build
 	$(DIALYZER) --plt .$(PROJECT).plt ebin
 
-release: clean compile
+release: compile
 	cd rel/; $(REBAR) generate
