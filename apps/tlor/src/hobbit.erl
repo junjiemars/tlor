@@ -167,23 +167,20 @@ handle_call({delete_node, Who, Passwd, Node}, _From, Session) ->
 
 handle_call({node_config, Who, Passwd, Node}, _From, Session) ->
     case login(Session, Who, Passwd) of
-        {ok, J} -> 
-            {ok, S} = application:get_env(pubsub_service),
-            N = exmpp_client_pubsub:get_node_configuration(S, Node),
-            P = exmpp_stanza:set_sender(N, J),
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive
-                        #received_packet{packet_type=iq, raw_packet=_R} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _R})}, restart_session(Session)}
-                    end;
-                E -> {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
-            end;
-        E -> {reply, E, restart_session(Session)}
+		{ok, J} -> 
+			case request_node_config(J, Node, Session) of 
+				{ok, P, R} -> 
+					{reply, ?DBG_RET(Session, {node_config, Session, P, R}), 
+						restart_session(Session)};
+				{E, P} -> {reply, ?DBG_RET(E, {node_config, E, P}), 
+					restart_session(Session)}
+			end;
+		E -> {reply, E, restart_session(Session)}
     end;
 
-handle_call({config_node, Who, Passwd, _Node, _Option, _Optarg}, _From, Session) ->
+handle_call({config_node, Who, Passwd, Node, _Option, _Optarg}, _From, Session) ->
     case login(Session, Who, Passwd) of
+<<<<<<< HEAD
         {ok, _J} ->
             {ok, _S} = application:get_env(pubsub_service),
             case request_node_config(_J, _S, _Node, Session) of
@@ -194,6 +191,19 @@ handle_call({config_node, Who, Passwd, _Node, _Option, _Optarg}, _From, Session)
                 E -> {reply, E, restart_session(Session)}
             end;
         E -> {reply, E, restart_session(Session)}
+=======
+        {ok, J} ->
+			case request_node_config(J, Node, Session) of 
+				{ok, P, R} -> 
+					T = exmpp_xml:set_attribute(R, exmpp_xml:attribute(<<"type">>, "set")),										
+					X = exmpp_xml:get_element(T, "xmlns=jabber:x:data", "x"),
+					{reply, {ok, ?DBG_RET(Session, {config_node, Session, P, R, T, X})}, 
+						restart_session(Session)};
+				{E, P} -> {reply, ?DBG_RET(E, {E, {config_node, E, P}}), 
+					restart_session(Session)}
+			end;
+       E -> {reply, E, restart_session(Session)}
+>>>>>>> ef95e7dc605dd5625a9b551ff4e48169d906c5dd
     end;
 
 handle_call({info, Code}, _From, Session) ->
@@ -224,6 +234,7 @@ code_change(_OldVsn, State, _Extra) ->
 login(Session, Who, Passwd) ->
     login(Session, Who, Passwd, ?RESOURCE, false).
 
+<<<<<<< HEAD
 request_node_config(Jid, Service, Node, Session) ->
     N = exmpp_client_pubsub:get_node_configuration(Service, Node),
     P = exmpp_stanza:set_sender(N, Jid),
@@ -267,3 +278,17 @@ set_cdata2([Node|Tail], Name, Attr, Cdata) ->
     end.
    
 
+=======
+request_node_config(Jid, Node, Session) ->
+	{ok, S} = application:get_env(pubsub_service),
+	N = exmpp_client_pubsub:get_node_configuration(S, Node),
+	P = exmpp_stanza:set_sender(N, Jid),
+	case send_packet(Session, P) of
+		{ok, _} -> 
+			receive
+				#received_packet{packet_type=iq, raw_packet=_R} -> {ok, P, _R}
+			end;
+		E -> {E, P}
+	end.
+ 
+>>>>>>> ef95e7dc605dd5625a9b551ff4e48169d906c5dd
