@@ -24,7 +24,7 @@
 -export([start_link/0]).
 -export([disco_info/2, disco_info/3, disco_items/2, disco_items/3]).
 -export([create_node/3, delete_node/3, node_config/3, config_node/5]).
--export([info/1, set_cdata/4]).
+-export([info/1, find_element/3, find_element_by_attr/4]).
 
 
 %% ------------------------------------------------------------------
@@ -52,7 +52,6 @@ node_config(Who, Passwd, Node) -> gen_server:call(?MODULE, {node_config, Who, Pa
 config_node(Who, Passwd, Node, Option, Optarg) -> gen_server:call(?MODULE, {config_node, Who, Passwd, Node, Option, Optarg}).
 
 info(Code) -> gen_server:call(?MODULE, {info, Code}).
-set_cdata(Node, Name, Attr, Cdata) -> gen_server:call(?MODULE, {set_cdata, Node, Name, Attr, Cdata}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -180,37 +179,16 @@ handle_call({node_config, Who, Passwd, Node}, _From, Session) ->
 
 handle_call({config_node, Who, Passwd, Node, _Option, _Optarg}, _From, Session) ->
     case login(Session, Who, Passwd) of
-<<<<<<< HEAD
-        {ok, _J} ->
-            {ok, _S} = application:get_env(pubsub_service),
-            case request_node_config(_J, _S, _Node, Session) of
-                {ok, N} -> 
-                    #xmlel{children=C} = N,
-                    Xold = find_element(C, "jabber:x:data", "x"),
-                    {reply, {ok, N, Xold}, restart_session(Session)};
-                E -> {reply, E, restart_session(Session)}
-            end;
-        E -> {reply, E, restart_session(Session)}
-=======
-        {ok, J} ->
+       {ok, J} ->
 			case request_node_config(J, Node, Session) of 
-				{ok, P, R} -> 
-					T = exmpp_xml:set_attribute(R, exmpp_xml:attribute(<<"type">>, "set")),										
-					X = exmpp_xml:get_element(T, "xmlns=jabber:x:data", "x"),
-					{reply, {ok, ?DBG_RET(Session, {config_node, Session, P, R, T, X})}, 
-						restart_session(Session)};
-				{E, P} -> {reply, ?DBG_RET(E, {E, {config_node, E, P}}), 
-					restart_session(Session)}
+				{ok, N} -> {reply, {ok, N}, restart_session(Session)};
+				E -> {reply, E, restart_session(Session)}
 			end;
        E -> {reply, E, restart_session(Session)}
->>>>>>> ef95e7dc605dd5625a9b551ff4e48169d906c5dd
     end;
 
 handle_call({info, Code}, _From, Session) ->
     {reply, info(Code, ?RESOURCE), Session};
-
-handle_call({set_cdata, Node, Name, Attr, Cdata}, _From, Session) ->
-    {reply, set_cdata2(Node, Name, Attr, Cdata)};
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -234,9 +212,9 @@ code_change(_OldVsn, State, _Extra) ->
 login(Session, Who, Passwd) ->
     login(Session, Who, Passwd, ?RESOURCE, false).
 
-<<<<<<< HEAD
-request_node_config(Jid, Service, Node, Session) ->
-    N = exmpp_client_pubsub:get_node_configuration(Service, Node),
+request_node_config(Jid, Node, Session) ->
+    {ok, S} = application:get_env(pubsub_service),
+    N = exmpp_client_pubsub:get_node_configuration(S, Node),
     P = exmpp_stanza:set_sender(N, Jid),
     case send_packet(Session, P) of
         {ok, _} ->
@@ -258,37 +236,15 @@ find_element([Node|_Tail], NS, Name) ->
             find_element(N, NS, Name)
     end.
 
-set_cdata2([], _Name, _Attr, _Cdata) ->
+find_element_by_attr([], _Name, _Attr, _Val) ->
     undefined;
 
-set_cdata2([Node|Tail], Name, Attr, Cdata) ->
-    case exmpp_xml:element_matches(Node, Name) of
-        true -> 
-            io:format("##~s~n", exmpp_xml:document_to_iolist(Node)),
-            set_cdata2(Tail, Name, Attr, Cdata);
-            %%case exmpp_xml:get_attribute(Node, <<"var">>, undefined) of
-            %%    undefined -> set_cdata2(Tail, Name, Attr, Cdata);
-            %%    Attr -> io:format("##~s~n", exmpp_xml:document_to_iolist(Node))
-            %%end;
-        false -> 
-            io:format("##~s~n", "nofound")
-            %%#xmlel{children=N} = Node,
-            %%io:format("##~s~n", exmpp_xml:document_to_iolist(N)),
-            %%set_cdata2(N, Name, Attr, Cdata)
+find_element_by_attr([Node|Tail], Name, Attr, Val) ->
+    case exmpp_xml:get_name_as_atom(Node) of
+        Name -> case exmpp_xml:get_attribute(Node, Attr, undefined) of 
+                    Val -> Node;
+                    _ -> find_element_by_attr(Tail, Name, Attr, Val)
+                end;
+        _ -> find_element_by_attr(Tail, Name, Attr, Val)
     end.
-   
 
-=======
-request_node_config(Jid, Node, Session) ->
-	{ok, S} = application:get_env(pubsub_service),
-	N = exmpp_client_pubsub:get_node_configuration(S, Node),
-	P = exmpp_stanza:set_sender(N, Jid),
-	case send_packet(Session, P) of
-		{ok, _} -> 
-			receive
-				#received_packet{packet_type=iq, raw_packet=_R} -> {ok, P, _R}
-			end;
-		E -> {E, P}
-	end.
- 
->>>>>>> ef95e7dc605dd5625a9b551ff4e48169d906c5dd
