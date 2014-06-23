@@ -141,11 +141,16 @@ handle_call({create_node, Who, Passwd, Node}, _From, Session) ->
                 {ok, _} ->
                     receive 
                         #received_packet{packet_type=iq, raw_packet=_Packet} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)}
+							_DbgRet = ?DBG_RET(Session, 
+								{send_packet, Session, P, _Packet}),
+                            {reply, {ok, _DbgRet}, restart_session(Session)}
                     end;
-                E -> {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
+                E -> 
+					_DbgRet = ?DBG_RET({error, E}, 
+						{E, {send_packet, Session, P}}) ,
+					{reply, _DbgRet, restart_session(Session)}
             end;
-        E -> {reply, E, restart_session(Session)}
+        E -> {reply, {error, E}, restart_session(Session)}
     end;
 
 handle_call({delete_node, Who, Passwd, Node}, _From, Session) ->

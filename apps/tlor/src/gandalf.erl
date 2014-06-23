@@ -22,7 +22,8 @@
 
 -export([start_link/0]).
 -export([register/2, disable/1]).
--export([publish/5, subscribe/3, unsubscribe/2, unsubscribe/4, subscriptions/2]).
+-export([publish/5, subscribe/3, unsubscribe/2, unsubscribe/4, 
+		subscriptions/2]).
 -export([sayto/4]).
 -export([roster/2, add_roster/5]).
 -export([info/1]).
@@ -33,7 +34,7 @@
 %% ------------------------------------------------------------------
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+		terminate/2, code_change/3]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -45,16 +46,23 @@ start_link() ->
 register(Who, Passwd) -> gen_server:call(?MODULE, {register, Who, Passwd}).
 disable(Who) -> gen_server:call(?MODULE, {disable, Who}).
 
-publish(Who, Passwd, Node, Type, Subject) -> gen_server:call(?MODULE, {publish, Who, Passwd, Node, Type, Subject}).
-subscribe(Who, Passwd, Node) -> gen_server:call(?MODULE, {subscribe, Who, Passwd, Node}).
-unsubscribe(Who, Passwd) -> gen_server:call(?MODULE, {unsubscribe, Who, Passwd}).
-unsubscribe(Who, Passwd, Node, Subid) -> gen_server:call(?MODULE, {unsubscribe, Who, Passwd, Node, Subid}).
-subscriptions(Who, Passwd) -> gen_server:call(?MODULE, {subscriptions, Who, Passwd}).
+publish(Who, Passwd, Node, Type, Subject) -> 
+	gen_server:call(?MODULE, {publish, Who, Passwd, Node, Type, Subject}).
+subscribe(Who, Passwd, Node) -> 
+	gen_server:call(?MODULE, {subscribe, Who, Passwd, Node}).
+unsubscribe(Who, Passwd) -> 
+	gen_server:call(?MODULE, {unsubscribe, Who, Passwd}).
+unsubscribe(Who, Passwd, Node, Subid) -> 
+	gen_server:call(?MODULE, {unsubscribe, Who, Passwd, Node, Subid}).
+subscriptions(Who, Passwd) -> 
+	gen_server:call(?MODULE, {subscriptions, Who, Passwd}).
 
-sayto(Who, Passwd, Whom, What) -> gen_server:call(?MODULE, {sayto, Who, Passwd, Whom, What}).
+sayto(Who, Passwd, Whom, What) -> 
+	gen_server:call(?MODULE, {sayto, Who, Passwd, Whom, What}).
 
 roster(Who, Passwd) -> gen_server:call(?MODULE, {roster, Who, Passwd}).
-add_roster(Who, Passwd, Whom, Group, Nick) -> gen_server:call(?MODULE, {add_roster, Who, Passwd, Whom, Group, Nick}).
+add_roster(Who, Passwd, Whom, Group, Nick) -> 
+	gen_server:call(?MODULE, {add_roster, Who, Passwd, Whom, Group, Nick}).
 
 info(Code) -> gen_server:call(?MODULE, {info, Code}).
 
@@ -85,8 +93,10 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
     case  login(Session, Who, Passwd) of
         {ok, J} ->
             E = exmpp_xml:element(?NS_PUBSUB_W3ATOM, "entry"),
-            T = exmpp_xml:append_cdata(exmpp_xml:element("type"), unicode:characters_to_binary(Type)),
-            S = exmpp_xml:append_cdata(exmpp_xml:element("subject"), unicode:characters_to_binary(Subject)),
+            T = exmpp_xml:append_cdata(exmpp_xml:element("type"), 
+					unicode:characters_to_binary(Type)),
+            S = exmpp_xml:append_cdata(exmpp_xml:element("subject"), 
+					unicode:characters_to_binary(Subject)),
             Item = exmpp_xml:append_children(E, [T, S]),
 
 			{ok, H} = application:get_env(pubsub_service),
@@ -97,11 +107,16 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
                 {ok, _} ->  
                     receive 
                         #received_packet{packet_type=iq, raw_packet=_Packet} ->
-                           {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)}
+							_DbgRet = ?DBG_RET(Session, 
+								{send_packet, Session, P, _Packet}),
+                           {reply, {ok, _DbgRet}, restart_session(Session)}
                     end;
-                {_, E} -> {reply, ?DBG_RET({error, E}, {E, {send_packet, Session, P}}), restart_session(Session)}
+                {_, E} -> 
+					_DbgRet = ?DBG_RET({error, E}, 
+						{E, {send_packet, Session, P}}),
+					{reply, _DbgRet, restart_session(Session)}
             end;
-        E -> {reply, E, restart_session(Session)}
+        E -> {reply, {error, E}, restart_session(Session)}
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
@@ -114,31 +129,42 @@ handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
                 {ok, _} ->
                     receive
                         #received_packet{packet_type=iq, raw_packet=_Packet} ->
-                        	{reply, {ok, ?DBG_RET(Session, {send_packet, Session, P})}, restart_session(Session)}
+							_DbgRet = ?DBG_RET(Session, 
+								{send_packet, Session, P}),
+                        	{reply, {ok, _DbgRet}, restart_session(Session)}
                     end;
-                E -> {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
+                E -> 
+					_DbgRet = ?DBG_RET({error, E}, 
+						{E, {send_packet, Session, P}}),
+					{reply, _DbgRet, restart_session(Session)}
             end;
-        E -> {reply, E, restart_session(Session)}
+        E -> {reply, {error, E}, restart_session(Session)}
     end;
 
 handle_call({unsubscribe, Who, Passwd}, _From, Session) ->
 	case subscriptions(Who, Passwd, _From, Session) of
 		{ok, R} -> 
-			S = exmpp_xml:get_element(exmpp_xml:get_element(R, "pubsub"), "subscriptions"),
+			S = exmpp_xml:get_element(exmpp_xml:get_element(R, "pubsub"), 
+				"subscriptions"),
 			exmpp_xml:foreach(
 				fun(_, C) -> 
-					Jid = binary_to_list(exmpp_xml:get_attribute(C, <<"jid">>, undefined)),
-					Sid = binary_to_list(exmpp_xml:get_attribute(C, <<"subid">>, undefined)),
-					Node = binary_to_list(exmpp_xml:get_attribute(C, <<"node">>, undefine)),
+					Jid = binary_to_list(
+						exmpp_xml:get_attribute(C, <<"jid">>, undefined)),
+					Sid = binary_to_list(
+						exmpp_xml:get_attribute(C, <<"subid">>, undefined)),
+					Node = binary_to_list(
+						exmpp_xml:get_attribute(C, <<"node">>, undefine)),
 					?DBG_OUT("jid:~p sid:~p node:~p", [Jid, Sid, Node]),
 					if Jid =:= Who ->
-						{ok, _P} = unsubscribe(Who, Passwd, Node, Sid, _From, Session),
-						?DBG_OUT("unsubscribe:~p", exmpp_xml:document_to_iolist(_P))
+						{ok, _P} = unsubscribe(Who, Passwd, Node, Sid, 
+							_From, Session),
+						?DBG_OUT("unsubscribe:~p", 
+							exmpp_xml:document_to_iolist(_P))
 					end
 				end,
 			S),	
 			{reply, {ok, R}, restart_session(Session)};
-		E -> {reply, E, restart_session(Session)}
+		E -> {reply, {error, E}, restart_session(Session)}
 	end;	
 
 handle_call({unsubscribe, Who, Passwd, Node, Subid}, _From, Session) ->
@@ -146,10 +172,15 @@ handle_call({unsubscribe, Who, Passwd, Node, Subid}, _From, Session) ->
         {ok, _} ->
 			case unsubscribe(Who, Passwd, Node, Subid, _From, Session) of
 				{ok, _P} -> 
-                	{reply, {ok, ?DBG_RET(Session, {unsubscribe, Session, Node, Subid, _P})}, restart_session(Session)};
-                E -> {reply, ?DBG_RET(E, {E, {unsubscribe, Session, Node, Subid}}), restart_session(Session)}
+					_DbgRet = ?DBG_RET(Session, 
+						{unsubscribe, Session, Node, Subid, _P}),
+                	{reply, {ok, _DbgRet}, restart_session(Session)};
+                E -> 
+					_DbgRet = ?DBG_RET({error, E}, 
+						{E, {unsubscribe, Session, Node, Subid}}),
+					{reply, _DbgRet, restart_session(Session)}
             end;
-        E -> {reply, E, restart_session(Session)}
+        E -> {reply, {error, E}, restart_session(Session)}
     end;
 
 handle_call({subscriptions, Who, Passwd}, _From, Session) ->
@@ -163,11 +194,16 @@ handle_call({subscriptions, Who, Passwd}, _From, Session) ->
 				{ok, _} ->
 				    receive
 				        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							{reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)}
+							_DbgRet = ?DBG_RET({Session, _Packet},
+								{send_packet, Session, P, _Packet}),
+							{reply, {ok, _DbgRet}, restart_session(Session)}
 				    end;
-				E -> ?DBG_OUT({E, now()}), {reply, {E, {send_packet, Session, P}}, restart_session(Session)}
+				E -> 
+					_DbgRet = ?DBG_RET({error, E},
+						{E, {subscriptions, Session}}),
+					{reply, _DbgRet, restart_session(Session)}
 			end;
-		E -> {reply, E, restart_session(Session)}
+		E -> {reply, {error, E}, restart_session(Session)}
 	end;
 
 handle_call({sayto, Who, Passwd, Whom, What}, _From, Session) ->
