@@ -8,3 +8,5 @@ deps
 apps/tlor/ebin/*
 rel/tlor/*
 
+.idea
+*#*.*#

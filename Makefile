@@ -15,7 +15,9 @@ compile:
 
 clean:
 	$(REBAR) clean
-	rm -f apps/tlor/ebin/*
+	rm -r apps/tlor/ebin/
+	rm -r rel/tlor/releases/
+	rm -r rel/tlor/lib/
 	find . -type f -name "*.dump" | xargs rm -f
 
 test: ct dialyze doc
