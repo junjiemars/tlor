@@ -1,6 +1,6 @@
 ## Name of the node
 ##-name tlor@127.0.0.1
--name tlor@as0
+-name tlor@192.168.21.168
 
 ## Cookie for distributed erlang
 -setcookie abc

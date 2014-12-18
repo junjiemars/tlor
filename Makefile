@@ -1,6 +1,6 @@
 PROJECT = tlor
 DIALYZER = dialyzer
-REBAR = rebar
+REBAR = $(PWD)/rebar
 OPTIONS = -Dtlor_debug
 RM_EBIN = apps/tlor/ebin/
 RM_TLOR = rel/tlor/
@@ -9,10 +9,13 @@ RM_TLOR = rel/tlor/
 
 all: deps compile
 
+rebar-version:
+	$(REBAR) --version
+
 deps:
 	$(REBAR) -C rebar.config get-deps
 
-compile:
+compile: deps
 	$(REBAR) compile $(OPTIONS)
 
 clean:
@@ -39,6 +42,9 @@ build-plt:
 
 dialyze: clean deps test-build
 	$(DIALYZER) --plt .$(PROJECT).plt ebin
+
+fix-exmpp-deps:
+	echo "waiting implement"
 
 release: compile
 	cd rel/; $(REBAR) generate
