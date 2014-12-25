@@ -24,7 +24,7 @@
 -export([register/2, disable/1]).
 -export([publish/5, subscribe/3, unsubscribe/2, unsubscribe/4, 
 		subscriptions/2]).
--export([sayto/4]).
+-export([say_to/4]).
 -export([roster/2, add_roster/5]).
 -export([info/1]).
 
@@ -57,8 +57,8 @@ unsubscribe(Who, Passwd, Node, Subid) ->
 subscriptions(Who, Passwd) -> 
 	gen_server:call(?MODULE, {subscriptions, Who, Passwd}).
 
-sayto(Who, Passwd, Whom, What) -> 
-	gen_server:call(?MODULE, {sayto, Who, Passwd, Whom, What}).
+say_to(Who, Passwd, Whom, What) -> 
+	gen_server:call(?MODULE, {say_to, Who, Passwd, Whom, What}).
 
 roster(Who, Passwd) -> gen_server:call(?MODULE, {roster, Who, Passwd}).
 add_roster(Who, Passwd, Whom, Group, Nick) -> 
@@ -206,16 +206,18 @@ handle_call({subscriptions, Who, Passwd}, _From, Session) ->
 		E -> {reply, {error, E}, restart_session(Session)}
 	end;
 
-handle_call({sayto, Who, Passwd, Whom, What}, _From, Session) ->
+handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
     case login(Session, Who, Passwd) of 
         {ok, U} -> 
             C = exmpp_message:chat(unicode:characters_to_binary(What)),
             P = exmpp_stanza:set_recipient(exmpp_stanza:set_sender(C, U), Whom),
             R = send_packet(Session, P),
-			sleep(150),
-            {reply, ?DBG_RET(R, {send_packet, Session, P, R}), restart_session(Session)}; 
+            sleep(150),
+
+            {reply, ?DBG_RET(R, {R, send_packet, Session, P}),
+             restart_session(Session)}; 
         E ->
-            {reply, E, restart_session(Session)}
+            {reply, restart_session(Session), E}
     end;
 
 handle_call({roster, Who, Passwd}, _From, Session) ->
