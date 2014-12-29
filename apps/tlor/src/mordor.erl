@@ -1,7 +1,7 @@
 -module(mordor).
 -author('junjiemars@gmail.com').
 
-%%-include("tlor.hrl").
+-include("tlor.hrl").
 
 
 %% ------------------------------------------------------------------
@@ -9,7 +9,7 @@
 %% ------------------------------------------------------------------
 
 -export([restart_session/1, send_packet/2]).
--export([login/5]).
+-export([login/4, login/5]).
 -export([sleep/1]).
 -export([info/2]).
 
@@ -30,28 +30,48 @@ send_packet(Session, Packet) ->
         exit:Reason -> {exit, Reason};
         error:Reason -> {error, Reason}
     end.
+
+login(Session, Who, Passwd, Resource) -> 
+    [U, N] = string:tokens(Who, "@"),
+    J = exmpp_jid:make(U, N, Resource),
+    exmpp_session:auth_basic_digest(Session, J, Passwd),
+
+    {ok, H} = application:get_env(?A, host_ipv4),
+    {ok, P} = application:get_env(?A, host_port),
+
+    {ok, _StreamId} = exmpp_session:connect_TCP(Session, H, P),
+    {ok, J} = exmpp_session:login(Session).
     
 login(Session, Who, Passwd, Resource, Autoreg) -> 
     [U, N] = string:tokens(Who, "@"),
     J = exmpp_jid:make(U, N, Resource),
     exmpp_session:auth_basic_digest(Session, J, Passwd),
 
-    {ok, H} = application:get_env(host_ipv4),
-    {ok, P} = application:get_env(host_port),
-    {ok, _StreamId} = exmpp_session:connect_TCP(Session, H, P),
+    {ok, H} = application:get_env(?A, host_ipv4),
+    {ok, P} = application:get_env(?A, host_port),
+
+    try exmpp_session:connect_TCP(Session, H, P) of
+        {ok, _StreamId} -> {ok, J}
+    catch
+        _:Econnect -> {error, Econnect}
+    end,
 
     try exmpp_session:login(Session) of
        _ -> {ok, J}
     catch
         throw:Reason ->
-            case Autoreg of
-                true ->
-                    exmpp_session:register_account(Session, Passwd),
-                    {ok, J};
-                false -> {error, Reason}
+            case Reason of
+                    {auth_error,'not-authorized'} ->
+                                case Autoreg of
+                                    true ->
+                                        exmpp_session:register_account(
+                                          Session, Passwd),
+                                        {ok, J};
+                                    false -> {error, Reason}
+                                end;
+                        _  -> {error, Reason}
             end;
-        exit:Reason -> exit(Reason);
-        error:Reason -> error(Reason)
+        _:Reason -> {error, Reason} %% exit:Reason/error:Reason
     end.
 
 sleep(T) ->

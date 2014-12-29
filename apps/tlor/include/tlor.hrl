@@ -1,4 +1,6 @@
 
+-define(A, tlor).
+
 -ifdef(tlor_debug).
 -define(DBG_OUT(A), io:format("#DBG_OUT(~p:~p:~p)~n", [?MODULE, ?LINE, A])).
 -define(DBG_OUT(F, A), io:format("#DBG_OUT(~p:~p:~p) :"++F++"~n", [self(), ?MODULE, ?LINE]++A)).
