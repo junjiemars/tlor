@@ -62,135 +62,87 @@ init(_Args) ->
     {ok, exmpp_session:start()}.
 
 handle_call({disco_info, Who, Passwd}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} -> 
-			{ok, S} = application:get_env(pubsub_service),
-		    I = exmpp_client_disco:info(S),
-			P = exmpp_stanza:set_sender(I, J),
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    I = exmpp_client_disco:info(S),
+    P = exmpp_stanza:set_sender(I, J),
 
-		    case send_packet(Session, P) of
-				{ok, _} ->
-				    receive 
-				        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							{reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)}
-				    end;
-				E -> ?DBG_OUT({E,now()}),{reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
-			end;
-		E -> {reply, E, restart_session(Session)}
-	end;
+
+    {ok, _} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
+    end;
 
 handle_call({disco_info, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} -> 
-			{ok, S} = application:get_env(pubsub_service),
-		    I = exmpp_client_disco:info(S, Node),
-			P = exmpp_stanza:set_sender(I, J),
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    I = exmpp_client_disco:info(S, Node),
+    P = exmpp_stanza:set_sender(I, J),
 
-		    case send_packet(Session, P) of
-				{ok, _} ->
-				    receive 
-				        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							{reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, Node, _Packet})}, restart_session(Session)}
-				    end;
-				E -> ?DBG_OUT({E,now()}),{reply, ?DBG_RET(E, {E, {send_packet, Session, P, Node}}), restart_session(Session)}
-			end;
-		E -> {reply, E, restart_session(Session)}
-	end;
+    {ok, _} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
+    end;
 
 handle_call({disco_items, Who, Passwd}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} ->
-			{ok, S} = application:get_env(pubsub_service),
-		    I = exmpp_client_disco:items(S),
-			P = exmpp_stanza:set_sender(I, J),
-		    case send_packet(Session, P) of
-				{ok, _} ->
-		    		receive
-		    		    #received_packet{packet_type=iq, raw_packet=_Packet} ->
-		    		       {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)} 
-		    		end;
-				E -> ?DBG_OUT({E, now()}), {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
-			end;
-		E -> {reply, E, restart_session(Session)}
-	end;
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    I = exmpp_client_disco:items(S),
+    P = exmpp_stanza:set_sender(I, J),
+
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
+    end;
 
 handle_call({disco_items, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} ->
-			{ok, S} = application:get_env(pubsub_service),
-		    I = exmpp_client_disco:items(S, Node),
-			P = exmpp_stanza:set_sender(I, J),
-		    case send_packet(Session, P) of
-				{ok, _} ->
-		    		receive
-		    		    #received_packet{packet_type=iq, raw_packet=_Packet} ->
-		    		       {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, Node, _Packet})}, restart_session(Session)} 
-		    		end;
-				E -> ?DBG_OUT({E, now()}), {reply, ?DBG_RET(E, {E, {send_packet, Session, P, Node}}), restart_session(Session)}
-			end;
-		E -> {reply, E, restart_session(Session)}
-	end;
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    I = exmpp_client_disco:items(S, Node),
+    P = exmpp_stanza:set_sender(I, J),
 
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)} 
+    end;
 
 handle_call({create_node, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-        {ok, _} ->
-			{ok, S} = application:get_env(pubsub_service),
-            P = exmpp_client_pubsub:create_node(S, Node), 
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive 
-                        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							_DbgRet = ?DBG_RET(Session, 
-								{send_packet, Session, P, _Packet}),
-                            {reply, {ok, _DbgRet}, restart_session(Session)}
-                    end;
-                E -> 
-					_DbgRet = ?DBG_RET({error, E}, 
-						{E, {send_packet, Session, P}}) ,
-					{reply, _DbgRet, restart_session(Session)}
-            end;
-        E -> {reply, {error, E}, restart_session(Session)}
+    {ok, _} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    P = exmpp_client_pubsub:create_node(S, Node), 
+
+    {ok, _} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
     end;
 
 handle_call({delete_node, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-        {ok, _} ->
-			{ok, S} = application:get_env(pubsub_service),
-            P = exmpp_client_pubsub:delete_node(S, Node),
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive
-                        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _Packet})}, restart_session(Session)}
-                    end;
-                E -> {reply, ?DBG_RET(E, {E, {send_packet, Session, P}}), restart_session(Session)}
-            end;
-        E -> {reply, E, restart_session(Session)}
+    {ok, _} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    P = exmpp_client_pubsub:delete_node(S, Node),
+
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
     end;
 
 handle_call({node_config, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} -> 
-			case request_node_config(J, Node, Session) of 
-				{ok, P, R} -> 
-					{reply, ?DBG_RET(Session, {node_config, Session, P, R}), 
-						restart_session(Session)};
-				{E, P} -> {reply, ?DBG_RET(E, {node_config, E, P}), 
-					restart_session(Session)}
-			end;
-		E -> {reply, E, restart_session(Session)}
-    end;
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, P, R} = request_node_config(J, Node, Session),
+    {reply, {P, R}, restart_session(Session)}
+        ;
 
-handle_call({config_node, Who, Passwd, Node, _Option, _Optarg}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-       {ok, J} ->
-			case request_node_config(J, Node, Session) of 
-				{ok, N} -> {reply, {ok, N}, restart_session(Session)};
-				E -> {reply, E, restart_session(Session)}
-			end;
-       E -> {reply, E, restart_session(Session)}
-    end;
+handle_call({config_node, Who, Passwd, Node, _Option, _Optarg},
+            _From, Session) ->
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, N} = request_node_config(J, Node, Session),
+    {reply, {ok, N}, restart_session(Session)};
 
 handle_call({info, Code}, _From, Session) ->
     {reply, info(Code, ?RESOURCE), Session};
@@ -218,7 +170,7 @@ login(Session, Who, Passwd) ->
     login(Session, Who, Passwd, ?RESOURCE, false).
 
 request_node_config(Jid, Node, Session) ->
-    {ok, S} = application:get_env(pubsub_service),
+    {ok, S} = application:get_env(?A, pubsub_service),
     N = exmpp_client_pubsub:get_node_configuration(S, Node),
     P = exmpp_stanza:set_sender(N, Jid),
     case send_packet(Session, P) of

@@ -75,10 +75,9 @@ init(_Args) ->
     {ok, exmpp_session:start()}.
 
 handle_call({register, Who, Passwd}, _From, Session) ->
-    case login(Session, Who, Passwd, true) of 
-        {ok, R} -> {reply, {ok, R}, restart_session(Session)};
-        {_,  E} -> {reply, {error, E}, restart_session(Session)}
-    end;
+    {ok, R} = login(Session, Who, Passwd, true),
+    {reply, {ok, R}, restart_session(Session)}
+    ;
 
 handle_call({disable, Who}, _From, Session) ->
     R = exmpp_client_register:get_registration_fields(Who),
@@ -109,91 +108,54 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-        {ok, _} ->
-            {ok, S} = application:get_env(pubsub_service),
-            P = exmpp_client_pubsub:subscribe(Who, S, Node),
+    {ok, _} = login(Session, Who, Passwd),
+    {ok, S} = application:get_env(?A, pubsub_service),
+    P = exmpp_client_pubsub:subscribe(Who, S, Node),
 
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive
-                        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							_DbgRet = ?DBG_RET(Session, 
-								{send_packet, Session, P}),
-                        	{reply, {ok, _DbgRet}, restart_session(Session)}
-                    end;
-                E -> 
-					_DbgRet = ?DBG_RET({error, E}, 
-						{E, {send_packet, Session, P}}),
-					{reply, _DbgRet, restart_session(Session)}
-            end;
-        E -> {reply, {error, E}, restart_session(Session)}
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
     end;
 
 handle_call({unsubscribe, Who, Passwd}, _From, Session) ->
-	case subscriptions(Who, Passwd, _From, Session) of
-		{ok, R} -> 
-			S = exmpp_xml:get_element(exmpp_xml:get_element(R, "pubsub"), 
-				"subscriptions"),
-			exmpp_xml:foreach(
-				fun(_, C) -> 
-					Jid = binary_to_list(
-						exmpp_xml:get_attribute(C, <<"jid">>, undefined)),
-					Sid = binary_to_list(
-						exmpp_xml:get_attribute(C, <<"subid">>, undefined)),
-					Node = binary_to_list(
-						exmpp_xml:get_attribute(C, <<"node">>, undefine)),
-					?DBG_OUT("jid:~p sid:~p node:~p", [Jid, Sid, Node]),
-					if Jid =:= Who ->
-						{ok, _P} = unsubscribe(Who, Passwd, Node, Sid, 
-							_From, Session),
-						?DBG_OUT("unsubscribe:~p", 
-							exmpp_xml:document_to_iolist(_P))
-					end
-				end,
-			S),	
-			{reply, {ok, R}, restart_session(Session)};
-		E -> {reply, {error, E}, restart_session(Session)}
-	end;	
+    {ok, R} = subscriptions(Who, Passwd, _From, Session),
+    S = exmpp_xml:get_element(
+          exmpp_xml:get_element(R, "pubsub"),
+          "subscriptions"),
+    exmpp_xml:foreach(
+      fun(_, C) -> 
+              Jid = binary_to_list(
+                      exmpp_xml:get_attribute(C, <<"jid">>, undefined)),
+              Sid = binary_to_list(
+                      exmpp_xml:get_attribute(C, <<"subid">>, undefined)),
+              Node = binary_to_list(
+                       exmpp_xml:get_attribute(C, <<"node">>, undefine)),
+              if Jid =:= Who ->
+                      {ok, _U} = unsubscribe(Who, Passwd, Node, Sid, 
+                                             _From, Session)
+              end
+      end,
+      S),	
+    {reply, {ok, R}, restart_session(Session)};
 
 handle_call({unsubscribe, Who, Passwd, Node, Subid}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-        {ok, _} ->
-			case unsubscribe(Who, Passwd, Node, Subid, _From, Session) of
-				{ok, _P} -> 
-					_DbgRet = ?DBG_RET(Session, 
-						{unsubscribe, Session, Node, Subid, _P}),
-                	{reply, {ok, _DbgRet}, restart_session(Session)};
-                E -> 
-					_DbgRet = ?DBG_RET({error, E}, 
-						{E, {unsubscribe, Session, Node, Subid}}),
-					{reply, _DbgRet, restart_session(Session)}
-            end;
-        E -> {reply, {error, E}, restart_session(Session)}
-    end;
+    {ok, _} = login(Session, Who, Passwd),
+    {ok, R} = unsubscribe(Who, Passwd, Node, Subid, _From, Session),
+    {reply, {ok, R}, restart_session(Session)}
+    ;
 
 handle_call({subscriptions, Who, Passwd}, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} ->
-			{ok, N} = application:get_env(pubsub_service),
-		    S = exmpp_client_pubsub:get_subscriptions(N),
-			P = exmpp_stanza:set_sender(S, J),
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, N} = application:get_env(?A, pubsub_service),
+    S = exmpp_client_pubsub:get_subscriptions(N),
+    P = exmpp_stanza:set_sender(S, J),
 
-		    case send_packet(Session, P) of
-				{ok, _} ->
-				    receive
-				        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							_DbgRet = ?DBG_RET({Session, _Packet},
-								{send_packet, Session, P, _Packet}),
-							{reply, {ok, _DbgRet}, restart_session(Session)}
-				    end;
-				E -> 
-					_DbgRet = ?DBG_RET({error, E},
-						{E, {subscriptions, Session}}),
-					{reply, _DbgRet, restart_session(Session)}
-			end;
-		E -> {reply, {error, E}, restart_session(Session)}
-	end;
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
+    end;
 
 handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
     {ok, U} = login(Session, Who, Passwd),
@@ -205,39 +167,30 @@ handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
     {reply, R, restart_session(Session)};
 
 handle_call({roster, Who, Passwd}, _From, Session) ->
-     case login(Session, Who, Passwd) of 
-        {ok, U} -> 
-            G = exmpp_client_roster:get_roster(),
-            P = exmpp_stanza:set_sender(G, U),
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive 
-                        #received_packet{packet_type=iq, raw_packet=_R} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _R})}, restart_session(Session)}
-                    end;
-                E -> ?DBG_RET(E, {reply, {E, {send_packet, Session, P}}, restart_session(Session)})
-            end;
-        E ->
-            {reply, E, restart_session(Session)}
+    {ok, U} = login(Session, Who, Passwd),
+    G = exmpp_client_roster:get_roster(),
+    P = exmpp_stanza:set_sender(G, U),
+
+    {ok, _} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
     end;
 
 handle_call({add_roster, Who, Passwd, Whom, Group, Nick}, _From, Session) ->
-     case login(Session, Who, Passwd) of 
-        {ok, U} -> 
-            G = exmpp_client_roster:set_item(Whom, unicode:characters_to_binary(Group), unicode:characters_to_binary(Nick)),
-            P = exmpp_stanza:set_sender(G, U),
-            case send_packet(Session, P) of
-                {ok, _} ->
-                    receive 
-                        #received_packet{packet_type=iq, raw_packet=_R} ->
-                            {reply, {ok, ?DBG_RET(Session, {send_packet, Session, P, _R})}, restart_session(Session)}
-                    end;
-                E -> ?DBG_RET(E, {reply, {E, {send_packet, Session, P}}, restart_session(Session)})
-            end;
-        E ->
-            {reply, E, restart_session(Session)}
-    end;
+    {ok, U} = login(Session, Who, Passwd),
+    G = exmpp_client_roster:set_item(Whom,
+                                     unicode:characters_to_binary(Group),
+                                     unicode:characters_to_binary(Nick)),
+    P = exmpp_stanza:set_sender(G, U),
 
+    {ok, _} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, Raw}, restart_session(Session)}
+    end
+    ;
+ 
 handle_call({login, Who, Passwd, Register}, _From, Session) ->
     R = login(Session, Who, Passwd, Register),
     {reply, R, restart_session(Session)};
@@ -272,34 +225,32 @@ login(Session, Who, Passwd, Autoreg) ->
     
 
 subscriptions(Who, Passwd, _From, Session) ->
-    case login(Session, Who, Passwd) of
-		{ok, J} ->
-			{ok, N} = application:get_env(pubsub_service),
-		    S = exmpp_client_pubsub:get_subscriptions(N),
-			P = exmpp_stanza:set_sender(S, J),
+    {ok, J} = login(Session, Who, Passwd),
+    {ok, N} = application:get_env(?A, pubsub_service),
+    S = exmpp_client_pubsub:get_subscriptions(N),
+    P = exmpp_stanza:set_sender(S, J),
 
-		    case send_packet(Session, P) of
-				{ok, _} ->
-				    receive
-				        #received_packet{packet_type=iq, raw_packet=Packet} -> {ok, Packet}
-				    end;
-				{_, E} -> E
-			end;
-		E -> E
-	end.
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {ok, Raw}
+    end.
 
 unsubscribe(Who, _Passwd, Node, Subid, _From, Session) ->
-	{ok, S} = application:get_env(pubsub_service),
-	U = exmpp_client_pubsub:unsubscribe(Who, S, Node),
-	Pubsub = exmpp_xml:get_element(U, "pubsub"),
-	Unsub = exmpp_xml:set_attribute(exmpp_xml:get_element(Pubsub, "unsubscribe"), <<"subid">>, Subid),
-	Npubsub = exmpp_xml:append_child(exmpp_xml:remove_element(Pubsub, "unsubscribe"), Unsub),
-	P = exmpp_xml:append_child(exmpp_xml:remove_element(U, "pubsub"), Npubsub),
-
-	case send_packet(Session, P) of
-	    {ok, _} ->
-	        receive
-	            #received_packet{packet_type=iq, raw_packet=Packet} -> {ok, Packet}
-	        end;
-	    E -> E
-	end.
+    {ok, S} = application:get_env(?A, pubsub_service),
+    U = exmpp_client_pubsub:unsubscribe(Who, S, Node),
+    Pubsub = exmpp_xml:get_element(U, "pubsub"),
+    Unsub = exmpp_xml:set_attribute(
+              exmpp_xml:get_element(Pubsub, "unsubscribe"),
+              <<"subid">>, Subid),
+    Npubsub = exmpp_xml:append_child(
+                exmpp_xml:remove_element(Pubsub, "unsubscribe"),
+                Unsub),
+    P = exmpp_xml:append_child(
+          exmpp_xml:remove_element(U, "pubsub"),
+          Npubsub),
+    {ok, _} = send_packet(Session, P),
+    receive
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {ok, Raw}
+    end.
