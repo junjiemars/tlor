@@ -90,33 +90,22 @@ handle_call({disable, Who}, _From, Session) ->
     {reply, R, Session};
 
 handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
-    case  login(Session, Who, Passwd) of
-        {ok, J} ->
-            E = exmpp_xml:element(?NS_PUBSUB_W3ATOM, "entry"),
-            T = exmpp_xml:append_cdata(exmpp_xml:element("type"), 
-					unicode:characters_to_binary(Type)),
-            S = exmpp_xml:append_cdata(exmpp_xml:element("subject"), 
-					unicode:characters_to_binary(Subject)),
-            Item = exmpp_xml:append_children(E, [T, S]),
+    {ok, J} = login(Session, Who, Passwd),
+    E = exmpp_xml:element(?NS_PUBSUB_W3ATOM, "entry"),
+    T = exmpp_xml:append_cdata(exmpp_xml:element("type"), 
+                               unicode:characters_to_binary(Type)),
+    S = exmpp_xml:append_cdata(exmpp_xml:element("subject"), 
+                               unicode:characters_to_binary(Subject)),
+    Item = exmpp_xml:append_children(E, [T, S]),
 
-			{ok, H} = application:get_env(pubsub_service),
-            X = exmpp_client_pubsub:publish(H, Node, Item),
-            P = exmpp_stanza:set_sender(X, J),
+    {ok, H} = application:get_env(?A, pubsub_service),
+    X = exmpp_client_pubsub:publish(H, Node, Item),
+    P = exmpp_stanza:set_sender(X, J),
 
-            case send_packet(Session, P) of
-                {ok, _} ->  
-                    receive 
-                        #received_packet{packet_type=iq, raw_packet=_Packet} ->
-							_DbgRet = ?DBG_RET(Session, 
-								{send_packet, Session, P, _Packet}),
-                           {reply, {ok, _DbgRet}, restart_session(Session)}
-                    end;
-                {_, E} -> 
-					_DbgRet = ?DBG_RET({error, E}, 
-						{E, {send_packet, Session, P}}),
-					{reply, _DbgRet, restart_session(Session)}
-            end;
-        E -> {reply, {error, E}, restart_session(Session)}
+    {ok, R} = send_packet(Session, P),
+    receive 
+        #received_packet{packet_type=iq, raw_packet=Raw} ->
+            {reply, {ok, R, Raw}, restart_session(Session)}
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
@@ -207,18 +196,13 @@ handle_call({subscriptions, Who, Passwd}, _From, Session) ->
 	end;
 
 handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
-    case login(Session, Who, Passwd) of 
-        {ok, U} -> 
-            C = exmpp_message:chat(unicode:characters_to_binary(What)),
-            P = exmpp_stanza:set_recipient(exmpp_stanza:set_sender(C, U), Whom),
-            R = send_packet(Session, P),
-            sleep(150),
-
-            {reply, ?DBG_RET(R, {R, send_packet, Session, P}),
-             restart_session(Session)}; 
-        E ->
-            {reply, restart_session(Session), E}
-    end;
+    {ok, U} = login(Session, Who, Passwd),
+    C = exmpp_message:chat(unicode:characters_to_binary(What)),
+    P = exmpp_stanza:set_recipient(
+          exmpp_stanza:set_sender(C, U), Whom),
+    R = send_packet(Session, P),
+    sleep(150),
+    {reply, R, restart_session(Session)};
 
 handle_call({roster, Who, Passwd}, _From, Session) ->
      case login(Session, Who, Passwd) of 
