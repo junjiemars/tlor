@@ -1,6 +1,6 @@
 PROJECT = tlor
 DIALYZER = dialyzer
-REBAR = $(PWD)/rebar
+REBAR = rebar
 OPTIONS = -Dtlor_debug
 RM_EBIN = apps/tlor/ebin/
 RM_TLOR = rel/tlor/
