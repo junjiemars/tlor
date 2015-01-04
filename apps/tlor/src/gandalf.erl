@@ -10,7 +10,7 @@
 %%-include_lib("exmpp/include/exmpp.hrl").
 
 -import(mordor, [sleep/1, 
-                 login/5, 
+                 login/4, login/5, 
                  restart_session/1, 
                  send_packet/2,
                  info/2
