@@ -218,10 +218,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 
 login(Session, Who, Passwd) ->
-    login(Session, Who, Passwd, ?RESOURCE, false).
+    login(Session, Who, Passwd, ?RESOURCE).
 
-login(Session, Who, Passwd, Autoreg) ->
-    login(Session, Who, Passwd, ?RESOURCE, Autoreg).
+%%login(Session, Who, Passwd, Autoreg) ->
+%%    login(Session, Who, Passwd, ?RESOURCE, Autoreg).
     
 
 subscriptions(Who, Passwd, _From, Session) ->
