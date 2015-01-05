@@ -101,10 +101,13 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
     X = exmpp_client_pubsub:publish(H, Node, Item),
     P = exmpp_stanza:set_sender(X, J),
 
+    {ok, Timeout} = application:get_env(?A, receive_timeout),
     {ok, R} = send_packet(Session, P),
     receive 
         #received_packet{packet_type=iq, raw_packet=Raw} ->
             {reply, {ok, R, Raw}, restart_session(Session)}
+        after Timeout ->
+                {reply, {ok, R, timeout}, restart_session(Session)}
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
