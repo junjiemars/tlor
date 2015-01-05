@@ -106,8 +106,8 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
     receive 
         #received_packet{packet_type=iq, raw_packet=Raw} ->
             {reply, {ok, R, Raw}, restart_session(Session)}
-        after Timeout ->
-                {reply, {ok, R, timeout}, restart_session(Session)}
+    after Timeout ->
+            {reply, {ok, R, timeout}, restart_session(Session)}
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
