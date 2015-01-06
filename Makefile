@@ -2,8 +2,6 @@ PROJECT = tlor
 DIALYZER = dialyzer
 REBAR = rebar
 OPTIONS = -Dtlor_debug
-RM_EBIN = apps/tlor/ebin/
-RM_TLOR = rel/tlor/
 
 .PHONY: all deps compile clean test ct build-plt dialyze release 
 
@@ -20,13 +18,11 @@ compile: deps
 
 clean:
 	$(REBAR) clean
-	if test -d $(RM_EBIN); then \
-		rm -r $(RM_EBIN); \
-	fi
-	if test -d $(RM_TLOR); then \
-		rm -r $(RM_TLOR); \
-	fi
-	find . -type f -name "*.dump" | xargs rm -f
+
+distclean: clean
+	@rm -r apps/tlor/ebin
+	@rm -r rel/tlor
+	@find . -type f -name "*.dump" | xargs rm -f
 
 test: ct dialyze doc
 
