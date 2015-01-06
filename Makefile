@@ -43,4 +43,4 @@ fix-exmpp-deps:
 	echo "waiting implement"
 
 release: compile
-	cd rel/; $(REBAR) generate
+	@(cd rel/; $(REBAR) generate)

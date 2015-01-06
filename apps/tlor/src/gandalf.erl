@@ -75,7 +75,7 @@ init(_Args) ->
     {ok, exmpp_session:start()}.
 
 handle_call({register, Who, Passwd}, _From, Session) ->
-    {ok, R} = login(Session, Who, Passwd, true),
+    {ok, R} = inline_login(Session, Who, Passwd, true),
     {reply, {ok, R}, restart_session(Session)}
     ;
 
@@ -89,7 +89,7 @@ handle_call({disable, Who}, _From, Session) ->
     {reply, R, Session};
 
 handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
-    {ok, J} = login(Session, Who, Passwd),
+    {ok, J} = inline_login(Session, Who, Passwd),
     E = exmpp_xml:element(?NS_PUBSUB_W3ATOM, "entry"),
     T = exmpp_xml:append_cdata(exmpp_xml:element("type"), 
                                unicode:characters_to_binary(Type)),
@@ -111,7 +111,7 @@ handle_call({publish, Who, Passwd, Node, Type, Subject}, _From, Session) ->
     end;
 
 handle_call({subscribe, Who, Passwd, Node}, _From, Session) ->
-    {ok, _} = login(Session, Who, Passwd),
+    {ok, _} = inline_login(Session, Who, Passwd),
     {ok, S} = application:get_env(?A, pubsub_service),
     P = exmpp_client_pubsub:subscribe(Who, S, Node),
 
@@ -143,13 +143,13 @@ handle_call({unsubscribe, Who, Passwd}, _From, Session) ->
     {reply, {ok, R}, restart_session(Session)};
 
 handle_call({unsubscribe, Who, Passwd, Node, Subid}, _From, Session) ->
-    {ok, _} = login(Session, Who, Passwd),
+    {ok, _} = inline_login(Session, Who, Passwd),
     {ok, R} = unsubscribe(Who, Passwd, Node, Subid, _From, Session),
     {reply, {ok, R}, restart_session(Session)}
     ;
 
 handle_call({subscriptions, Who, Passwd}, _From, Session) ->
-    {ok, J} = login(Session, Who, Passwd),
+    {ok, J} = inline_login(Session, Who, Passwd),
     {ok, N} = application:get_env(?A, pubsub_service),
     S = exmpp_client_pubsub:get_subscriptions(N),
     P = exmpp_stanza:set_sender(S, J),
@@ -161,7 +161,7 @@ handle_call({subscriptions, Who, Passwd}, _From, Session) ->
     end;
 
 handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
-    {ok, U} = login(Session, Who, Passwd),
+    {ok, U} = inline_login(Session, Who, Passwd),
     C = exmpp_message:chat(unicode:characters_to_binary(What)),
     P = exmpp_stanza:set_recipient(
           exmpp_stanza:set_sender(C, U), Whom),
@@ -170,7 +170,7 @@ handle_call({say_to, Who, Passwd, Whom, What}, _From, Session) ->
     {reply, R, restart_session(Session)};
 
 handle_call({roster, Who, Passwd}, _From, Session) ->
-    {ok, U} = login(Session, Who, Passwd),
+    {ok, U} = inline_login(Session, Who, Passwd),
     G = exmpp_client_roster:get_roster(),
     P = exmpp_stanza:set_sender(G, U),
 
@@ -181,7 +181,7 @@ handle_call({roster, Who, Passwd}, _From, Session) ->
     end;
 
 handle_call({add_roster, Who, Passwd, Whom, Group, Nick}, _From, Session) ->
-    {ok, U} = login(Session, Who, Passwd),
+    {ok, U} = inline_login(Session, Who, Passwd),
     G = exmpp_client_roster:set_item(Whom,
                                      unicode:characters_to_binary(Group),
                                      unicode:characters_to_binary(Nick)),
@@ -194,10 +194,6 @@ handle_call({add_roster, Who, Passwd, Whom, Group, Nick}, _From, Session) ->
     end
     ;
  
-handle_call({login, Who, Passwd, Register}, _From, Session) ->
-    R = login(Session, Who, Passwd, Register),
-    {reply, R, restart_session(Session)};
-
 handle_call({info, Code}, _From, Session) ->
     {reply, info(Code, ?RESOURCE), Session};
 
@@ -220,15 +216,15 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-login(Session, Who, Passwd) ->
+inline_login(Session, Who, Passwd) ->
     login(Session, Who, Passwd, ?RESOURCE).
 
-%%login(Session, Who, Passwd, Autoreg) ->
-%%    login(Session, Who, Passwd, ?RESOURCE, Autoreg).
+inline_login(Session, Who, Passwd, Autoreg) ->
+    login(Session, Who, Passwd, ?RESOURCE, Autoreg).
     
 
 subscriptions(Who, Passwd, _From, Session) ->
-    {ok, J} = login(Session, Who, Passwd),
+    {ok, J} = inline_login(Session, Who, Passwd),
     {ok, N} = application:get_env(?A, pubsub_service),
     S = exmpp_client_pubsub:get_subscriptions(N),
     P = exmpp_stanza:set_sender(S, J),
