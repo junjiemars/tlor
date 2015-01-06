@@ -1,6 +1,7 @@
+%% otp application specification
 {application, tlor,
  [
-  {description, ""},
+  {description, "the lord of rings"},
   {vsn, "1"},
   {registered, []},
   {applications, [

@@ -3,7 +3,7 @@ DIALYZER = dialyzer
 REBAR = rebar
 OPTIONS = -Dtlor_debug
 
-.PHONY: all deps compile clean test ct build-plt dialyze release 
+.PHONY: all deps compile clean distclean test ct build-plt dialyze release 
 
 all: deps compile
 
@@ -17,10 +17,9 @@ compile: deps
 	$(REBAR) compile $(OPTIONS)
 
 clean:
-	$(REBAR) clean
+	@(cd apps/tlor && $(REBAR) clean)
 
 distclean: clean
-	@rm -r apps/tlor/ebin
 	@rm -r rel/tlor
 	@find . -type f -name "*.dump" | xargs rm -f
 
@@ -43,4 +42,4 @@ fix-exmpp-deps:
 	echo "waiting implement"
 
 release: compile
-	@(cd rel/; $(REBAR) generate)
+	@(cd rel/ && $(REBAR) generate)
