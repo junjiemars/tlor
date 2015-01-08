@@ -1,11 +1,11 @@
-PROJECT = tlor
-DIALYZER = dialyzer
-REBAR = rebar
-OPTIONS = -Dtlor_debug
+PROJECT=tlor
+DIALYZER=dialyzer
+REBAR=rebar
+OPTIONS= -Dtlor_debug
 
-.PHONY: all deps compile clean distclean test ct build-plt dialyze release 
+.PHONY: all deps compile clean test ct build-plt dialyze release 
 
-all: deps compile
+all: release
 
 rebar-version:
 	$(REBAR) --version

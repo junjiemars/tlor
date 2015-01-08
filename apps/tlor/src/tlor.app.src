@@ -2,7 +2,7 @@
 {application, tlor,
  [
   {description, "the lord of rings"},
-  {vsn, "1"},
+  {vsn, "1.1.0"},
   {registered, []},
   {applications, [
                   kernel,

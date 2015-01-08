@@ -2,9 +2,7 @@
 -behaviour(gen_server).
 -author('junjiemars@gmail.com').
 
--define(SERVER, ?MODULE).
 -define(RESOURCE, "gandalf").
--define(NS_PUBSUB_W3ATOM, 'http://www.w3.org/2005/Atom').
 
 -include("tlor.hrl").
 %%-include_lib("exmpp/include/exmpp.hrl").
@@ -41,7 +39,7 @@
 %% ------------------------------------------------------------------
 
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 register(Who, Passwd) -> gen_server:call(?MODULE, {register, Who, Passwd}).
 disable(Who) -> gen_server:call(?MODULE, {disable, Who}).
