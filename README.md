@@ -29,7 +29,7 @@ the format like: pubsub.abc.def
 3. debug: `rel/tlor/bin/tlor console`
 
 ## What's you can do
-1. register: register new user
-2. publish: publish to the owner node with any content
-3. say_to: say to somebody just in time
-4. some else your can find it yourself
+1. Register new user
+2. Publish to the owner node with any content
+3. Say to somebody just in time
+4. Something else your want it then found it
