@@ -1,10 +1,10 @@
 ## Name of the node
 ##-name tlor@127.0.0.1
 ##-name tlor@k27
--name tlor@192.168.21.168
+-name tlor@<your-tlor-ipv4>
 
 ## Cookie for distributed erlang
--setcookie abc
+-setcookie <your-tlor-cookie>
 
 ## Heartbeat management; auto-restarts VM if it dies or becomes unresponsive
 ## (Disabled by default..use with caution!)
